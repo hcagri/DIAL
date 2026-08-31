@@ -4,19 +4,19 @@ defaults:
 
 
 wandb: True
-wandb_run_name: 16-Jan-2026 ZINC-SAKU Design-2 k=4 - cosine schedule LR=3e-3, WD=1e-5, N_WARMUP=10000
+wandb_run_name: 16-Jan-2026 ZINC-dial Design-2 k=4 - cosine schedule LR=3e-3, WD=1e-5, N_WARMUP=10000
 wandb_project: ICML-2026
 
 base_model: gine
 gine_model_bn: False
-pe_method: saku
+pe_method: dial
 n_node_types: 28  
 n_edge_types: 3
 node_emb_dims: 128
 pooling: add
 
-sample_aggr_model_name: saku-gin
-saku_diag_est_place: after_bn
+sample_aggr_model_name: dial-gin
+dial_diag_est_place: after_bn
 pe_dims: 37   # based on SPE paper by Huang et al. (2023)
 n_sample_aggr_layers: 8
 sample_aggr_hidden_dims: 40

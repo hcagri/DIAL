@@ -77,7 +77,7 @@ class Trainer:
         self.target = target
         cfg.out_dirpath = root(cfg.out_dirpath)
 
-        root_path = "/home/cbilgi/projects/saku-pe/PEARL/data"
+        root_path = "/home/cbilgi/projects/dial-pe/PEARL/data"
 
         train_dataset = dp.dataset_random_graph(dataname='count_cycle', root = root_path,processed_name='processed', transform=self.MyTransform,split='train')
         val_dataset = dp.dataset_random_graph(dataname='count_cycle', root = root_path,processed_name='processed', transform=self.MyTransform, split='val')
@@ -222,7 +222,7 @@ class Trainer:
             if self.basis:
                 W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
             else:
-                if self.cfg.pe_method == 'saku':
+                if self.cfg.pe_method == 'dial':
                     W = np.random.choice([-1, 1], 
                                          size=(batch.Lap[i].shape[0],self.num_samples))
                     W = torch.from_numpy(W).float().to(self.device)
@@ -250,7 +250,7 @@ class Trainer:
             if self.basis:
                 W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
             else:
-                if self.cfg.pe_method == 'saku':
+                if self.cfg.pe_method == 'dial':
                     W = np.random.choice([-1, 1], 
                                          size=(batch.Lap[i].shape[0],self.num_samples))
                     W = torch.from_numpy(W).float().to(self.device)

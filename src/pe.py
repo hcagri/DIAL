@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from torch_geometric.utils import unbatch
 
-from src.gin import GIN, GINSaku
+from src.gin import GIN, GINdial
 from src.gine import GINE
 from src.mlp import MLP
 from torch_scatter import scatter_add
@@ -150,7 +150,7 @@ class PEARLPositionalEncoder(nn.Module):
     def out_dims(self) -> int:
         return self.sample_aggr.out_dims
 
-class SakuPositionalEncoder(nn.Module):
+class dialPositionalEncoder(nn.Module):
     def __init__(self, sample_aggr: nn.Module, basis, k=16, mlp_nlayers=1, mlp_hid=16, pearl_act='relu', mlp_out=16) -> None:
         super().__init__()
         self.mlp_nlayers = mlp_nlayers
@@ -196,7 +196,7 @@ class SakuPositionalEncoder(nn.Module):
                     output = output.transpose(0, 1)
             W_list.append(output)             # [NxMxK]*B
         
-        if  isinstance(self.sample_aggr, SakuGINSampleAggregator):
+        if  isinstance(self.sample_aggr, dialGINSampleAggregator):
             return self.sample_aggr(z_0, W_list, edge_index, self.basis, final=final)   # [N_sum, D_pe]
         else:
             return self.sample_aggr(W_list, edge_index, self.basis, final=final)   # [N_sum, D_pe]
@@ -254,16 +254,16 @@ class GINSampleAggregator(nn.Module):
     def out_dims(self) -> int:
         return self.gin.out_dims
 
-class SakuGINSampleAggregator(nn.Module):
-    gin: GINSaku
+class dialGINSampleAggregator(nn.Module):
+    gin: GINdial
 
     def __init__(
-        self, n_layers: int, in_dims: int, hidden_dims: int, out_dims: int, create_mlp: Callable[[int, int], MLP], bn: bool, saku_diag_est_place: str = "after_bn"
+        self, n_layers: int, in_dims: int, hidden_dims: int, out_dims: int, create_mlp: Callable[[int, int], MLP], bn: bool, dial_diag_est_place: str = "after_bn"
     ) -> None:
         super().__init__()
         # store explicitly to avoid clashing with the read-only property below
         self._out_dims = out_dims
-        self.gin = GINSaku(n_layers, in_dims, hidden_dims, out_dims, create_mlp, bn, laplacian=None, saku_diag_est_place=saku_diag_est_place) # out_dims is not being used in GINSaku
+        self.gin = GINdial(n_layers, in_dims, hidden_dims, out_dims, create_mlp, bn, laplacian=None, dial_diag_est_place=dial_diag_est_place) # out_dims is not being used in GINdial
         self.mlp = create_mlp(out_dims, out_dims, use_bias=True)
         self.running_sum = 0
 
@@ -280,7 +280,7 @@ class SakuGINSampleAggregator(nn.Module):
         :return: Positional encoding matrix. [N_sum, D_pe]
         """
 
-        # warnings.warn("Beaware you are still using SAKU-GIN !!!")
+        # warnings.warn("Beaware you are still using dial-GIN !!!")
 
         if not basis:
             W = torch.cat(W_list, dim=0)  
@@ -288,7 +288,7 @@ class SakuGINSampleAggregator(nn.Module):
             PE = self.lin(torch.cat(outs, dim=-1)).mean(dim=1)
             return PE              
         else:
-            raise Exception("SakuGINSampleAggregator does not support basis yet")
+            raise Exception("dialGINSampleAggregator does not support basis yet")
 
     @property
     def out_dims(self) -> int:
@@ -298,8 +298,8 @@ def GetSampleAggregator(cfg: Schema, create_mlp: Callable[[int, int], MLP], devi
     if cfg.sample_aggr_model_name == 'gin':
         return GINSampleAggregator(cfg.n_sample_aggr_layers, cfg.pearl_mlp_out, cfg.sample_aggr_hidden_dims, cfg.pe_dims,
                                          create_mlp, cfg.batch_norm)
-    elif cfg.sample_aggr_model_name == 'saku-gin':
-        return SakuGINSampleAggregator(cfg.n_sample_aggr_layers, cfg.pearl_mlp_out, cfg.sample_aggr_hidden_dims, cfg.pe_dims,
-                                         create_mlp, cfg.batch_norm, cfg.saku_diag_est_place)
+    elif cfg.sample_aggr_model_name == 'dial-gin':
+        return dialGINSampleAggregator(cfg.n_sample_aggr_layers, cfg.pearl_mlp_out, cfg.sample_aggr_hidden_dims, cfg.pe_dims,
+                                         create_mlp, cfg.batch_norm, cfg.dial_diag_est_place)
     else:
         raise Exception ("sample_aggr function not implemented!")

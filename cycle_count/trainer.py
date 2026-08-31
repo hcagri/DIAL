@@ -231,7 +231,7 @@ class Trainer:
             if self.basis:
                 W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
             else:
-                if self.cfg.pe_method == 'saku':
+                if self.cfg.pe_method == 'dial':
                     W = np.random.choice([-1, 1], 
                                          size=(batch.Lap[i].shape[0],self.num_samples))
                     W = torch.from_numpy(W).float().to(self.device)
@@ -259,7 +259,7 @@ class Trainer:
             if self.basis:
                 W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
             else:
-                if self.cfg.pe_method == 'saku':
+                if self.cfg.pe_method == 'dial':
                     W = np.random.choice([-1, 1], 
                                          size=(batch.Lap[i].shape[0],self.num_samples))
                     W = torch.from_numpy(W).float().to(self.device)

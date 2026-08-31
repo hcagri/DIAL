@@ -6,6 +6,14 @@
 *.err
 *.out
 
+/RandomFeaturePropagator/
+/data/graph/
+/data/node/
+/data/ogbg_molhiv/
+
+/sweep_results/
+/sweep_results_pearl/
+
 *.vscode/
 configs_old/
 # ======================================================================================================================

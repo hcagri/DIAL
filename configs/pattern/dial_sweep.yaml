@@ -9,13 +9,13 @@ defaults:
 
 # --- Logging ---
 wandb: True
-wandb_run_name: 16-Jan-2026 Saku-PATTERN n_sample_aggr_layers=4, sweep on K [1, 2, 4, 8, 12, 16]
+wandb_run_name: 16-Jan-2026 dial-PATTERN n_sample_aggr_layers=4, sweep on K [1, 2, 4, 8, 12, 16]
 wandb_project: ICML-2026
 
 # --- Model Selection ---
 base_model: gin_node_classifier
 gine_model_bn: False
-pe_method: saku
+pe_method: dial
 n_node_types: 1  
 n_edge_types: 1
 node_emb_dims: 64
@@ -24,8 +24,8 @@ pooling: None
 n_base_layers: 0
 base_hidden_dims: 64
 
-sample_aggr_model_name: saku-gin
-saku_diag_est_place: after_bn
+sample_aggr_model_name: dial-gin
+dial_diag_est_place: after_bn
 pe_dims: 37   # based on SPE paper by Huang et al. (2023)
 n_sample_aggr_layers: 4
 sample_aggr_hidden_dims: 40

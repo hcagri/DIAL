@@ -66,4 +66,4 @@ class Schema:
     
     gine_model_bn: bool
     target_dim: int
-    saku_diag_est_place: str  # where to collect diagonal estimates: "before_bn" or "after_bn"
+    dial_diag_est_place: str  # where to collect diagonal estimates: "before_bn" or "after_bn"

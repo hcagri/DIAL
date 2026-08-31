@@ -51,7 +51,7 @@ nesterov: false
 
 n_warmup_steps: 100
 target_dim: 1
-saku_diag_est_place: after_bn
+dial_diag_est_place: after_bn
 
 n_epochs: 1400
 out_dirpath: out/baseline

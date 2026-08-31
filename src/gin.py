@@ -62,16 +62,16 @@ class GIN(nn.Module):
     def out_dims(self) -> int:
         return self.layers[-1].out_dims
     
-class GINSaku(nn.Module):
+class GINdial(nn.Module):
     layers: nn.ModuleList
 
     def __init__(
         self, n_layers: int, in_dims: int, hidden_dims: int, out_dims: int, create_mlp: Callable[[int, int], MLP],
-            bn: bool = False, residual: bool = False, laplacian=None, saku_diag_est_place: str = "after_bn"
+            bn: bool = False, residual: bool = False, laplacian=None, dial_diag_est_place: str = "after_bn"
     ) -> None:
         super().__init__()
 
-        self.saku_diag_est_place = saku_diag_est_place
+        self.dial_diag_est_place = dial_diag_est_place
 
         self.layers = nn.ModuleList()
         self.bn = bn
@@ -94,7 +94,7 @@ class GINSaku(nn.Module):
         :param edge_index: Graph connectivity in COO format. [2, E_sum]
         :return: Output node feature matrix. [N_sum, ***, D_out]
         """
-        # warnings.warn("Beaware you are still using SAKU-GIN !!!")
+        # warnings.warn("Beaware you are still using dial-GIN !!!")
         
         outs = []
         for i, layer in enumerate(self.layers):
@@ -117,7 +117,7 @@ class GINSaku(nn.Module):
                 X = X + X0
             
             post_norm = z_0*X
-            if self.saku_diag_est_place == "before_bn":
+            if self.dial_diag_est_place == "before_bn":
                 outs.append(pre_norm)
             else:
                 outs.append(post_norm)
