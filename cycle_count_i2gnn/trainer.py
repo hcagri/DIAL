@@ -77,7 +77,7 @@ class Trainer:
         self.target = target
         cfg.out_dirpath = root(cfg.out_dirpath)
 
-        root_path = "/home/cbilgi/projects/dial-pe/PEARL/data"
+        root_path = root("data")
 
         train_dataset = dp.dataset_random_graph(dataname='count_cycle', root = root_path,processed_name='processed', transform=self.MyTransform,split='train')
         val_dataset = dp.dataset_random_graph(dataname='count_cycle', root = root_path,processed_name='processed', transform=self.MyTransform, split='val')
@@ -192,9 +192,9 @@ class Trainer:
             if self.wandb:
                 wandb.log({'train_loss': train_loss, 'val_loss': val_loss, 'test_loss': test_loss, 'lr': lr})
             if val_loss.sum() < best_val_loss:
+                best_val_loss = val_loss
+                best_test_loss, best_test_loss_normed = test_loss, test_loss_normed
                 if self.wandb:
-                    best_val_loss = val_loss
-                    best_test_loss, best_test_loss_normed = test_loss, test_loss_normed
                     wandb.run.summary["best_val_loss" + str(seed)] = best_val_loss
                     wandb.run.summary["Test MAE:" + str(seed)] = best_test_loss
                     wandb.run.summary["Test MAE norm:" + str(seed)] = best_test_loss_normed

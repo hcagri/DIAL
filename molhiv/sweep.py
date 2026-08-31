@@ -76,7 +76,8 @@ def run_single_experiment(
     
     # Initialize WandB for this sweep run
     if base_cfg.wandb:
-        wandb.login(key="")  # use your own WandB key
+        if not testing:
+            wandb.login(key="")  # use your own WandB key
         wandb.init(
             mode="disabled" if testing else "online",
             dir=root("."),

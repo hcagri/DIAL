@@ -50,7 +50,8 @@ def main() -> None:
     print("=" * 50)
 
     if cfg.wandb:
-        wandb.login(key="") # use your own WanbB key
+        if not args.testing:
+            wandb.login(key="")  # use your own WandB key
         wandb.init(
             mode="disabled" if args.testing else "online",
             dir=root("."), 

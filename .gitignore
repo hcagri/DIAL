@@ -10,6 +10,7 @@
 /data/graph/
 /data/node/
 /data/ogbg_molhiv/
+/data/drugood/
 
 /sweep_results/
 /sweep_results_pearl/

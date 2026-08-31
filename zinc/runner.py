@@ -31,7 +31,8 @@ def main() -> None:
     cfg.subset_size = args.subset_size
 
     if cfg.wandb:
-        wandb.login(key="") # use your own WanbB key
+        if not args.testing:
+            wandb.login(key="")  # use your own WandB key
         wandb.init(
             mode="disabled" if args.testing else "online",
             dir=root("."), 

@@ -202,9 +202,9 @@ class Trainer:
             if self.wandb:
                 wandb.log({'train_loss': train_loss, 'val_loss': val_loss, 'test_loss': test_loss, 'lr': lr})
             if val_loss.sum() < best_val_loss:
+                best_val_loss = val_loss.sum()
+                best_test_loss = test_loss
                 if self.wandb:
-                    best_val_loss = val_loss.sum()
-                    best_test_loss = test_loss
                     wandb.run.summary["best_val_loss" + str(seed)] = best_val_loss
                     wandb.run.summary["best_test_loss" + str(seed)] = best_test_loss
                     wandb.run.summary["best_training_loss" + str(seed)] = train_loss
