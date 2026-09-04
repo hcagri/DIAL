@@ -77,7 +77,7 @@ class Trainer:
         cfg.out_dirpath = root(cfg.out_dirpath)
 
         processed_suffix = '_pe' + str(cfg.pe_dims) if cfg.pe_method != 'none' else ''
-        transform = self.get_lap
+        transform = self.get_lap if cfg.pe_method != 'none' else None
         print('ZINC Subset is: ', cfg.use_subset)
         train_dataset = ZINC(root("data/zinc"), subset=cfg.use_subset, split="train", pre_transform=None,
                              transform=transform, processed_suffix=processed_suffix)
@@ -120,14 +120,29 @@ class Trainer:
 
         os.makedirs(cfg.out_dirpath, exist_ok=True)
         self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        handler = logging.FileHandler(os.path.join(cfg.out_dirpath, f"train_logs_{self.run_timestamp}.txt"))
+        self.checkpoint_path = os.path.join(
+            cfg.out_dirpath,
+            f"best_seed{self.seed}_{self.run_timestamp}.pt",
+        )
+        handler = logging.FileHandler(
+            os.path.join(
+                cfg.out_dirpath,
+                f"train_seed{self.seed}_{self.run_timestamp}.log",
+            )
+        )
         handler.setLevel(logging.INFO)
 
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "%Y/%m/%d %H:%M:%S")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
-        self.val_writer = open(os.path.join(cfg.out_dirpath, f"evaluate_logs_{self.run_timestamp}.txt"), "a")
+        self.val_writer = open(
+            os.path.join(
+                cfg.out_dirpath,
+                f"evaluate_seed{self.seed}_{self.run_timestamp}.log",
+            ),
+            "a",
+        )
 
         # Set up WandB
         self.wandb = cfg.wandb
@@ -152,26 +167,34 @@ class Trainer:
         self.logger.info(
             "Optimizer groups:\n" + "\n".join(group["name"] for group in self.optimizer.param_groups) + "\n")
 
-        best_val_loss, best_test_loss = 999.0, 999.0
+        best_val_loss = float('inf')
+        best_epoch = 0
+        best_state = None
         for self.curr_epoch in range(1, self.cfg.n_epochs + 1):
             train_loss = self.train_epoch()
-            val_loss = self.evaluate(self.val_loader)
-            test_loss = self.evaluate(self.test_loader)
-            # self.scheduler.step(eval_loss)
-            # lr = self.scheduler.get_last_lr()[0]
+            val_loss = self.evaluate(self.val_loader, evaluation_seed=10_000)
             lr = self.optimizer.state_dict()['param_groups'][0]['lr']
             if self.wandb:
-                wandb.log({'train_loss': train_loss, 'eval_loss': val_loss, 'test_loss': test_loss, 'lr': lr})
+                wandb.log({'train_loss': train_loss, 'eval_loss': val_loss, 'lr': lr})
             if val_loss < best_val_loss:
-                best_val_loss, best_test_loss = val_loss, test_loss
-                if self.wandb:
-                    wandb.run.summary["best_val_loss" + str(seed)] = best_val_loss
-                    wandb.run.summary["best_test_loss" + str(seed)] = best_test_loss
-                    wandb.run.summary["best_training_loss" + str(seed)] = train_loss
-                if self.curr_epoch > 800:
-                    new_name = './' + name + '.pth'
-                    torch.save(self.model.state_dict(), new_name)
-                
+                best_val_loss = val_loss
+                best_epoch = self.curr_epoch
+                best_state = {
+                    param_name: value.detach().cpu().clone()
+                    for param_name, value in self.model.state_dict().items()
+                }
+                torch.save(best_state, self.checkpoint_path)
+
+        if best_state is None:
+            raise RuntimeError("Training completed without a validation checkpoint")
+
+        self.model.load_state_dict(best_state)
+        best_test_loss = self.evaluate(self.test_loader, evaluation_seed=20_000)
+        if self.wandb:
+            wandb.run.summary["best_epoch" + str(seed)] = best_epoch
+            wandb.run.summary["best_val_loss" + str(seed)] = best_val_loss
+            wandb.run.summary["best_test_loss" + str(seed)] = best_test_loss
+
         return best_test_loss
 
     def train_epoch(self) -> float:
@@ -186,20 +209,7 @@ class Trainer:
     def train_batch(self, batch: Batch) -> float:
         batch.to(device(self.model))
         self.optimizer.zero_grad()
-        W_list = []
-        for i in range(len(batch.Lap)):
-            if self.basis:
-                W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
-            else:
-                if self.cfg.pe_method == 'dial':
-                    W = np.random.choice([-1, 1], 
-                                         size=(batch.Lap[i].shape[0],self.num_samples))
-                    W = torch.from_numpy(W).float().to(self.device)
-                else:
-                    W = torch.randn(batch.Lap[i].shape[0],self.num_samples).to(self.device) #BxNxM
-            if len(W.shape) < 2:
-                print("TRAIN BATCH, i, LAP|W: ", i, batch.Lap[i].shape, W.shape)
-            W_list.append(W)
+        W_list = self.sample_probes(batch)
         y_pred = self.model(batch, W_list)               # [B]
         loss = self.criterion(y_pred, batch.y)   # [1]
         loss.backward()
@@ -212,11 +222,13 @@ class Trainer:
         return loss * batch.y.size(0)
         # return loss
 
-    def evaluate(self, eval_loader: DataLoader) -> float:
+    def evaluate(self, eval_loader: DataLoader, evaluation_seed: int = 0) -> float:
         self.model.eval()
         total_loss = 0.0
+        generator = torch.Generator(device=self.device)
+        generator.manual_seed(self.seed + evaluation_seed)
         for self.curr_batch, batch in enumerate(eval_loader, 1):
-            total_loss += self.evaluate_batch(batch)
+            total_loss += self.evaluate_batch(batch, generator)
             self.logger.info(f"Evaluating... Epoch: {self.curr_epoch}, batch: {self.curr_batch}")
         total_loss /= len(eval_loader.dataset)
 
@@ -225,23 +237,9 @@ class Trainer:
         # wandb.log({"val_loss": total_loss})
         return total_loss
 
-    def evaluate_batch(self, batch: Batch) -> float:
+    def evaluate_batch(self, batch: Batch, generator=None) -> float:
         batch.to(device(self.model))
-        W_list = []
-        for i in range(len(batch.Lap)):
-            if self.basis:
-                W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
-            else:
-                if self.cfg.pe_method == 'dial':
-                    W = np.random.choice([-1, 1], 
-                                         size=(batch.Lap[i].shape[0],self.num_samples))
-                    W = torch.from_numpy(W).float().to(self.device)
-                else:
-                    W = torch.randn(batch.Lap[i].shape[0],self.num_samples).to(self.device) #BxNxM
-
-            if len(W.shape) < 2:
-                print("EVAL BATCH, i, LAP|W: ", i, batch.Lap[i].shape, W.shape)
-            W_list.append(W)
+        W_list = self.sample_probes(batch, generator)
         with torch.no_grad():
             y_pred = self.model(batch, W_list)
         return self.metric(y_pred, batch.y).item()
@@ -268,6 +266,26 @@ class Trainer:
         L = to_dense_adj(L_edge_index, edge_attr=L_values, max_num_nodes=n).squeeze(dim=0)
         instance.Lap = L
         return instance
+
+    def sample_probes(self, batch: Batch, generator=None):
+        if self.cfg.pe_method == 'none':
+            return []
+
+        probes = []
+        for lap in batch.Lap:
+            if self.basis:
+                W = torch.eye(lap.shape[0], device=self.device)
+            elif self.cfg.pe_method == 'dial':
+                W = torch.empty(
+                    lap.shape[0], self.num_samples, device=self.device
+                ).bernoulli_(0.5, generator=generator).mul_(2).sub_(1)
+            else:
+                W = torch.randn(
+                    lap.shape[0], self.num_samples,
+                    device=self.device, generator=generator,
+                )
+            probes.append(W)
+        return probes
 
     def get_param_groups(self) -> List[Dict[str, Any]]:
         return [{

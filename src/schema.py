@@ -67,3 +67,9 @@ class Schema:
     gine_model_bn: bool
     target_dim: int
     dial_diag_est_place: str  # where to collect diagonal estimates: "before_bn" or "after_bn"
+
+    # GPS backbone attributes. Defaults keep existing experiment configs valid.
+    gps_heads: int = 4
+    gps_dropout: float = 0.0
+    gps_attn_dropout: float = 0.0
+    gps_local_model: str = "gine"

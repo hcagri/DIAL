@@ -19,8 +19,16 @@ def main() -> None:
     parser.add_argument("--subset_size", type=int, default=-1)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--num_seeds", type=int, default=4)
+    parser.add_argument(
+        "--out_dirpath",
+        type=str,
+        default=None,
+        help="Optional output directory overriding the value in the config.",
+    )
     parser.add_argument("--testing", action="store_true")
     args = parser.parse_args()
+    if args.num_seeds < 1:
+        raise ValueError("--num_seeds must be at least 1")
 
     cs = ConfigStore.instance()
     cs.store(name="schema", node=Schema)
@@ -29,10 +37,10 @@ def main() -> None:
 
     cfg: Schema = OmegaConf.to_object(dict_cfg)
     cfg.subset_size = args.subset_size
+    if args.out_dirpath is not None:
+        cfg.out_dirpath = args.out_dirpath
 
     if cfg.wandb:
-        if not args.testing:
-            wandb.login(key="")  # use your own WandB key
         wandb.init(
             mode="disabled" if args.testing else "online",
             dir=root("."), 
@@ -48,7 +56,8 @@ def main() -> None:
         print(f"Test loss best on seed {cfg.seed}: {test_loss_best}")
         total_test_loss += test_loss_best
         
-    wandb.run.summary["ave_test_loss"] = total_test_loss / args.num_seeds
+    if cfg.wandb:
+        wandb.run.summary["ave_test_loss"] = total_test_loss / args.num_seeds
 
 
 if __name__ == "__main__":

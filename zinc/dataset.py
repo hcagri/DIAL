@@ -4,7 +4,6 @@ import pickle
 import shutil
 from typing import Callable, List, Optional
 
-import mmcv
 import torch
 from tqdm import tqdm
 
@@ -171,4 +170,3 @@ class ZINC(InMemoryDataset):
 
             torch.save(self.collate(data_list),
                        osp.join(self.processed_dir, f'{split}.pt'))
-
