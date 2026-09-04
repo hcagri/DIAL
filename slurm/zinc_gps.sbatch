@@ -6,8 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8G
 #SBATCH --time=2-00:00:00
-#SBATCH --gres=gpu:1
-#SBATCH --constraint='titan_rtx|geforce_rtx_3090|a6000|a100'
+#SBATCH --gres=gpu:titan_rtx:1
 #SBATCH --array=0-9
 #SBATCH --output=/itet-stor/speltonen/net_scratch/dial/log/%x-%A_%a.out
 #SBATCH --error=/itet-stor/speltonen/net_scratch/dial/log/%x-%A_%a.err
