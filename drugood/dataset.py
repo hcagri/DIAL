@@ -5,7 +5,6 @@ import shutil
 from typing import Callable, List, Optional
 from rdkit import Chem
 import rdkit
-import mmcv
 import torch
 from tqdm import tqdm
 import numpy as np

@@ -6,8 +6,9 @@ from torch_geometric.data import Batch
 from torch_geometric.nn import global_mean_pool, global_add_pool
 
 from src.gine import GINE
+from src.gps import GPSBaseModel
 from src.mlp import MLP
-from src.pe import PEARLPositionalEncoder, GetSampleAggregator, SakuPositionalEncoder
+from src.pe import PEARLPositionalEncoder, GetSampleAggregator, dialPositionalEncoder
 from src.gin import GIN
 from src.other_gnns import PNA
 from src.schema import Schema
@@ -30,6 +31,21 @@ def construct_model(cfg: Schema, list_create_mlp, deg1=None, peptides=False, **k
             residual=kwargs.get("residual"), feature_type=kwargs.get('feature_type'), pooling=cfg.pooling,
             target_dim=target_dim, bn=cfg.gine_model_bn, pe_emb=cfg.pe_dims, peptides=peptides
         )
+
+    elif cfg.base_model == 'gps':
+        base_model = GPSBaseModel(
+            cfg.n_base_layers,
+            cfg.n_edge_types,
+            cfg.node_emb_dims,
+            cfg.base_hidden_dims,
+            create_mlp,
+            pooling=cfg.pooling,
+            target_dim=target_dim,
+            heads=cfg.gps_heads,
+            dropout=cfg.gps_dropout,
+            attn_dropout=cfg.gps_attn_dropout,
+            local_model=cfg.gps_local_model,
+        )
     
     elif cfg.base_model == 'pna':
         base_model = PNABaseModel(
@@ -51,9 +67,12 @@ def construct_model(cfg: Schema, list_create_mlp, deg1=None, peptides=False, **k
         sample_aggr = GetSampleAggregator(cfg, create_mlp_ln, kwargs['device']) 
         pe_model = PEARLPositionalEncoder(sample_aggr, cfg.basis, k=cfg.pearl_k, mlp_nlayers=cfg.pearl_mlp_nlayers, mlp_hid=cfg.pearl_mlp_hid, pearl_act=cfg.pearl_act, mlp_out=cfg.pearl_mlp_out)
     
-    elif cfg.pe_method == 'saku':
+    elif cfg.pe_method == 'dial':
         sample_aggr = GetSampleAggregator(cfg, create_mlp_ln, kwargs['device']) 
-        pe_model = SakuPositionalEncoder(sample_aggr, cfg.basis, k=cfg.pearl_k, mlp_nlayers=cfg.pearl_mlp_nlayers, mlp_hid=cfg.pearl_mlp_hid, pearl_act=cfg.pearl_act, mlp_out=cfg.pearl_mlp_out)
+        pe_model = dialPositionalEncoder(sample_aggr, cfg.basis, k=cfg.pearl_k, mlp_nlayers=cfg.pearl_mlp_nlayers, mlp_hid=cfg.pearl_mlp_hid, pearl_act=cfg.pearl_act, mlp_out=cfg.pearl_mlp_out)
+
+    elif cfg.pe_method == 'none':
+        pe_model = None
     
     else:
         raise Exception("PE method not implemented!")

@@ -1,10 +1,20 @@
 /data/zinc/
+/data/superpixels/
 /out/
 /wandb/
 
 # Error and output files
 *.err
 *.out
+
+/RandomFeaturePropagator/
+/data/graph/
+/data/node/
+/data/ogbg_molhiv/
+/data/drugood/
+
+/sweep_results/
+/sweep_results_pearl/
 
 *.vscode/
 configs_old/

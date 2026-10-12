@@ -35,7 +35,8 @@ def main():
 
     # Initialize wandb for the sweep
     if cfg.wandb:
-        wandb.login(key="")  # use your own Wandb key
+        if not args.testing:
+            wandb.login(key="")  # use your own WandB key
         wandb.init(
             mode="disabled" if args.testing else "online",
             dir=root("."),

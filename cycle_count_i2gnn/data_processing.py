@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import csv
-from rdkit import Chem
 import torch
 from networkx import read_graph6
 from torch_geometric.data import InMemoryDataset, Data
@@ -18,7 +17,6 @@ import os.path as osp
 import sys
 from typing import Callable, List, Optional
 import torch.nn.functional as F
-from torch_scatter import scatter
 from tqdm import tqdm
 from torch_geometric.data import (
     Data,

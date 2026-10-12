@@ -20,8 +20,21 @@ def main() -> None:
     parser.add_argument("--gpu_id", type=int, required=False, default=0)
     parser.add_argument("--subset_size", type=int, default=-1)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--num_seeds", type=int, default=3)
+    parser.add_argument(
+        "--out_dirpath",
+        type=str,
+        default=None,
+        help="Optional output directory overriding the value in the config.",
+    )
+    parser.add_argument(
+        "--cycles", type=str, default="3,4,5,6",
+        help="Comma-separated cycle lengths to run (subset of 3,4,5,6).",
+    )
     parser.add_argument("--testing", action="store_true")
     args = parser.parse_args()
+    if args.num_seeds < 1:
+        raise ValueError("--num_seeds must be at least 1")
 
     cs = ConfigStore.instance()
     cs.store(name="schema", node=Schema)
@@ -30,9 +43,10 @@ def main() -> None:
 
     cfg: Schema = OmegaConf.to_object(dict_cfg)
     cfg.subset_size = args.subset_size
+    if args.out_dirpath is not None:
+        cfg.out_dirpath = args.out_dirpath
 
     if cfg.wandb:
-        wandb.login(key="") # use your own Wandb key
         wandb.init(
             mode="disabled" if args.testing else "online",
             dir=root("."), 
@@ -44,20 +58,29 @@ def main() -> None:
 
 
     # Configuration
-    cycles = [3, 4, 5, 6]  # Cycle counts to evaluate
-    seeds = [0,1,2]
+    cycles = [
+        int(cycle.strip())
+        for cycle in args.cycles.split(',')
+        if cycle.strip()
+    ]
+    if not cycles:
+        raise ValueError("--cycles must contain at least one cycle length")
+    invalid_cycles = sorted(set(cycles) - {3, 4, 5, 6})
+    if invalid_cycles:
+        raise ValueError(f"Unsupported cycle lengths: {invalid_cycles}")
+    seeds = range(args.seed, args.seed + args.num_seeds)
     
     # Collect results: {cycle: [loss_per_seed]}
     results = {cycle: [] for cycle in cycles}
     results_normed = {cycle: [] for cycle in cycles}
     
     # Nested loop: for each cycle-task, run training across all seeds
-    for task_idx, cycle in enumerate(cycles):
-        cfg.task = task_idx
+    for cycle in cycles:
+        cfg.task = cycle - 3
         for seed in seeds:
             cfg.seed = seed
             trainer = Trainer(cfg, cycle-3, args.gpu_id)
-            best_test_loss, best_test_loss_normed = trainer.train()
+            best_test_loss, best_test_loss_normed = trainer.train(cfg.seed)
             results[cycle].append(best_test_loss)
             results_normed[cycle].append(best_test_loss_normed)
     

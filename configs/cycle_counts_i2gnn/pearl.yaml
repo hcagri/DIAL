@@ -25,7 +25,7 @@ n_base_layers: 5
 base_hidden_dims: 64
 
 sample_aggr_model_name: gin
-saku_diag_est_place: after_bn
+dial_diag_est_place: after_bn
 pe_dims: 37   # based on SPE paper by Huang et al. (2023)
 n_sample_aggr_layers: 6
 sample_aggr_hidden_dims: 48

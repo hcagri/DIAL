@@ -58,4 +58,4 @@ out_dirpath: out/baseline
 wandb: True
 wandb_run_name: basis_k=7
 wandb_project: log-2026
-saku_diag_est_place: after_bn
+dial_diag_est_place: after_bn

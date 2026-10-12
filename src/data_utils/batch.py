@@ -31,7 +31,6 @@ class Batch(Data):
         assert 'batch' not in keys
 
         batch = Batch()
-        batch.Lap = [data.Lap for data in data_list]
         batch.__data_class__ = data_list[0].__class__
         batch.__slices__ = {key: [0] for key in keys}
 

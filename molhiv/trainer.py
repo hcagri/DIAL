@@ -7,8 +7,8 @@ from typing import TextIO, Optional, List, Dict, Any
 import math 
 import warnings
 
-# Show SAKU-GIN warning only once (not per forward pass)
-warnings.filterwarnings('once', message='Beaware you are still using SAKU-GIN')
+# Show dial-GIN warning only once (not per forward pass)
+warnings.filterwarnings('once', message='Beaware you are still using dial-GIN')
 
 import numpy as np
 import torch
@@ -180,7 +180,7 @@ class Trainer:
                 if self.basis:
                     W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
                 else:
-                    if self.cfg.pe_method == 'saku':
+                    if self.cfg.pe_method == 'dial':
                         W = np.random.choice([-1, 1], 
                                             size=(batch.Lap[i].shape[0],self.num_samples))
                         W = torch.from_numpy(W).float().to(self.device)
@@ -222,7 +222,7 @@ class Trainer:
                     if self.basis:
                         W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
                     else:
-                        if self.cfg.pe_method == 'saku':
+                        if self.cfg.pe_method == 'dial':
                             W = np.random.choice([-1, 1], 
                                                 size=(batch.Lap[i].shape[0], self.num_samples))
                             W = torch.from_numpy(W).float().to(self.device)

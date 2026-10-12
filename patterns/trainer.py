@@ -236,9 +236,9 @@ class Trainer:
             if self.wandb:
                 wandb.log({'train_loss': train_loss, 'val_loss': val_loss, 'test_loss': test_loss, 'val_f1': val_f1, 'test_f1': test_f1, 'lr': lr})
             if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_test_f1 = test_f1
                 if self.wandb:
-                    best_val_loss = val_loss
-                    best_test_f1 = test_f1
                     wandb.run.summary["best_val_loss" + str(seed)] = best_val_loss
                     wandb.run.summary["best_test_f1" + str(seed)] = best_test_f1
                     wandb.run.summary["best_training_loss" + str(seed)] = train_loss
@@ -266,7 +266,7 @@ class Trainer:
             if self.basis:
                 W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
             else:
-                if self.cfg.pe_method == 'saku':
+                if self.cfg.pe_method == 'dial':
                     W = np.random.choice([-1, 1], 
                                          size=(batch.Lap[i].shape[0],self.num_samples))
                     W = torch.from_numpy(W).float().to(self.device)
@@ -294,7 +294,7 @@ class Trainer:
             if self.basis:
                 W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
             else:
-                if self.cfg.pe_method == 'saku':
+                if self.cfg.pe_method == 'dial':
                     W = np.random.choice([-1, 1], 
                                          size=(batch.Lap[i].shape[0],self.num_samples))
                     W = torch.from_numpy(W).float().to(self.device)

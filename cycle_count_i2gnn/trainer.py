@@ -77,7 +77,7 @@ class Trainer:
         self.target = target
         cfg.out_dirpath = root(cfg.out_dirpath)
 
-        root_path = "/home/cbilgi/projects/saku-pe/PEARL/data"
+        root_path = root("data")
 
         train_dataset = dp.dataset_random_graph(dataname='count_cycle', root = root_path,processed_name='processed', transform=self.MyTransform,split='train')
         val_dataset = dp.dataset_random_graph(dataname='count_cycle', root = root_path,processed_name='processed', transform=self.MyTransform, split='val')
@@ -94,6 +94,7 @@ class Trainer:
         print('For target %d, Mean = %.3f, Std = %.3f' % (self.target, mean[self.target], std[self.target]))
 
         self.std = std
+        self.target_std = std[self.target].item()
 
         self.test_loader = DataLoader(test_dataset, batch_size=cfg.val_batch_size)
         self.val_loader = DataLoader(val_dataset, batch_size=cfg.val_batch_size)
@@ -147,13 +148,23 @@ class Trainer:
 
         os.makedirs(cfg.out_dirpath, exist_ok=True)
         self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        handler = logging.FileHandler(os.path.join(cfg.out_dirpath, f"train_logs_{self.run_timestamp}.txt"))
+        self.checkpoint_path = os.path.join(
+            cfg.out_dirpath,
+            f"best_cycle{self.target + 3}_seed{self.seed}_{self.run_timestamp}.pt",
+        )
+        run_label = f"cycle{self.target + 3}_seed{self.seed}_{self.run_timestamp}"
+        handler = logging.FileHandler(
+            os.path.join(cfg.out_dirpath, f"train_{run_label}.log")
+        )
         handler.setLevel(logging.INFO)
 
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "%Y/%m/%d %H:%M:%S")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
-        self.val_writer = open(os.path.join(cfg.out_dirpath, f"evaluate_logs_{self.run_timestamp}.txt"), "a")
+        self.val_writer = open(
+            os.path.join(cfg.out_dirpath, f"evaluate_{run_label}.log"),
+            "a",
+        )
 
         # Set up WandB
         self.wandb = cfg.wandb
@@ -179,28 +190,44 @@ class Trainer:
             "Optimizer groups:\n" + "\n".join(group["name"] for group in self.optimizer.param_groups) + "\n")
 
         best_val_loss = float('inf')
-        best_test_loss = float('inf')
-        best_test_loss_normed = float('inf')
+        best_epoch = 0
+        best_state = None
         for self.curr_epoch in range(1, self.cfg.n_epochs + 1):
             train_loss = self.train_epoch()
-            val_loss  = self.evaluate(self.val_loader)
+            val_loss = self.evaluate(self.val_loader, evaluation_seed=10_000)
             self.scheduler.step(val_loss)
-            test_loss  = self.evaluate(self.test_loader)
-            test_loss_normed = test_loss / self.std[self.target]
 
             lr = self.optimizer.state_dict()['param_groups'][0]['lr']
             if self.wandb:
-                wandb.log({'train_loss': train_loss, 'val_loss': val_loss, 'test_loss': test_loss, 'lr': lr})
-            if val_loss.sum() < best_val_loss:
-                if self.wandb:
-                    best_val_loss = val_loss
-                    best_test_loss, best_test_loss_normed = test_loss, test_loss_normed
-                    wandb.run.summary["best_val_loss" + str(seed)] = best_val_loss
-                    wandb.run.summary["Test MAE:" + str(seed)] = best_test_loss
-                    wandb.run.summary["Test MAE norm:" + str(seed)] = best_test_loss_normed
-                    wandb.run.summary["best_training_loss" + str(seed)] = train_loss
-                
-                print(f"EPOCH {self.curr_epoch}: Val MAE {best_val_loss}, Test MAE: {best_test_loss}, Test MAE norm: {best_test_loss_normed}")
+                wandb.log({'train_loss': train_loss, 'val_loss': val_loss, 'lr': lr})
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_epoch = self.curr_epoch
+                best_state = {
+                    name: value.detach().cpu().clone()
+                    for name, value in self.model.state_dict().items()
+                }
+                torch.save(best_state, self.checkpoint_path)
+                print(f"EPOCH {self.curr_epoch}: Val MAE {best_val_loss}")
+
+        if best_state is None:
+            raise RuntimeError("Training completed without a validation checkpoint")
+
+        self.model.load_state_dict(best_state)
+        best_test_loss = self.evaluate(
+            self.test_loader, evaluation_seed=20_000
+        )
+        best_test_loss_normed = best_test_loss / self.target_std
+        if self.wandb:
+            wandb.run.summary["best_epoch" + str(seed)] = best_epoch
+            wandb.run.summary["best_val_loss" + str(seed)] = best_val_loss
+            wandb.run.summary["Test MAE:" + str(seed)] = best_test_loss
+            wandb.run.summary["Test MAE norm:" + str(seed)] = best_test_loss_normed
+
+        print(
+            f"BEST EPOCH {best_epoch}: Val MAE {best_val_loss}, "
+            f"Test MAE: {best_test_loss}, Test MAE norm: {best_test_loss_normed}"
+        )
 
         return best_test_loss, best_test_loss_normed
 
@@ -217,20 +244,7 @@ class Trainer:
     def train_batch(self, batch: Batch) -> float:
         batch.to(device(self.model))
         self.optimizer.zero_grad()
-        W_list = []
-        for i in range(len(batch.Lap)):
-            if self.basis:
-                W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
-            else:
-                if self.cfg.pe_method == 'saku':
-                    W = np.random.choice([-1, 1], 
-                                         size=(batch.Lap[i].shape[0],self.num_samples))
-                    W = torch.from_numpy(W).float().to(self.device)
-                else:
-                    W = torch.randn(batch.Lap[i].shape[0],self.num_samples).to(self.device) #BxNxM
-            if len(W.shape) < 2:
-                print("TRAIN BATCH, i, LAP|W: ", i, batch.Lap[i].shape, W.shape)
-            W_list.append(W)
+        W_list = self.sample_probes(batch)
         y_pred = self.model(batch, W_list)               # [B]
         loss = self.criterion(y_pred, batch.y.view(-1, 1))   # [1]
         loss.backward()
@@ -243,22 +257,9 @@ class Trainer:
         return loss * batch.y.size(0)
 
 
-    def evaluate_batch(self, batch: Batch) -> float:
+    def evaluate_batch(self, batch: Batch, generator=None) -> float:
         batch.to(device(self.model))
-        W_list = []
-        for i in range(len(batch.Lap)):
-            if self.basis:
-                W = torch.eye(batch.Lap[i].shape[0]).to(self.device)
-            else:
-                if self.cfg.pe_method == 'saku':
-                    W = np.random.choice([-1, 1], 
-                                         size=(batch.Lap[i].shape[0],self.num_samples))
-                    W = torch.from_numpy(W).float().to(self.device)
-                else:
-                    W = torch.randn(batch.Lap[i].shape[0],self.num_samples).to(self.device) #BxNxM
-            if len(W.shape) < 2:
-                print("EVAL BATCH, i, LAP|W: ", i, batch.Lap[i].shape, W.shape)
-            W_list.append(W)
+        W_list = self.sample_probes(batch, generator)
 
         with torch.no_grad():
             y_pred = self.model(batch, W_list)
@@ -266,20 +267,22 @@ class Trainer:
         return self.metric(y_pred, batch.y.view(-1, 1))
 
     @torch.no_grad()
-    def evaluate(self, eval_loader: DataLoader):
+    def evaluate(self, eval_loader: DataLoader, evaluation_seed: int = 0):
         self.model.eval()
 
         total_loss = 0.0
         total_count = 0
+        generator = torch.Generator(device=self.device)
+        generator.manual_seed(self.seed + evaluation_seed)
 
         for batch in eval_loader:
-            loss = self.evaluate_batch(batch)
+            loss = self.evaluate_batch(batch, generator)
             self.logger.info(f"Evaluating... Epoch: {self.curr_epoch}, batch: {self.curr_batch}")
         
-            total_loss += loss
+            total_loss += loss.item()
             total_count += batch.y.size(0)
         
-        avg_loss = total_loss / max(total_count, 1) * self.std[self.target]
+        avg_loss = total_loss / max(total_count, 1) * self.target_std
 
         self.val_writer.write(f"Epoch: {self.curr_epoch}\t Loss: {avg_loss}\n")
         self.val_writer.flush()
@@ -310,6 +313,26 @@ class Trainer:
         instance.Lap = L
         return instance
 
+    def sample_probes(self, batch: Batch, generator=None):
+        if self.cfg.pe_method == 'none':
+            return []
+
+        probes = []
+        for lap in batch.Lap:
+            if self.basis:
+                W = torch.eye(lap.shape[0], device=self.device)
+            elif self.cfg.pe_method == 'dial':
+                W = torch.empty(
+                    lap.shape[0], self.num_samples, device=self.device
+                ).bernoulli_(0.5, generator=generator).mul_(2).sub_(1)
+            else:
+                W = torch.randn(
+                    lap.shape[0], self.num_samples,
+                    device=self.device, generator=generator,
+                )
+            probes.append(W)
+        return probes
+
     def get_param_groups(self) -> List[Dict[str, Any]]:
         return [{
             "name": name,
@@ -332,7 +355,8 @@ class Trainer:
             # Assign constant features (all ones) to each node
             g.x = torch.ones((N, 1), dtype=torch.float)
         g.y = g.y[:, int(self.target)]
-        g = self.get_lap(g)
+        if self.cfg.pe_method != 'none':
+            g = self.get_lap(g)
         return g
 
 

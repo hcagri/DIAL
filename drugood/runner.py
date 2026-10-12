@@ -32,11 +32,10 @@ def main() -> None:
     cfg.subset_size = args.subset_size
 
     if cfg.wandb:
-        wandb.login(key="") # use your own Wandb key
         wandb.init(
             mode="disabled" if args.testing else "online",
-            dir=root("."), 
-            project="PEARL", 
+            dir=root("."),
+            project=cfg.wandb_project,
             name=cfg.wandb_run_name, 
             config=cfg.__dict__,
             settings=wandb.Settings(code_dir=".")

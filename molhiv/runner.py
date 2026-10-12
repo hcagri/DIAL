@@ -43,14 +43,15 @@ def main() -> None:
     print(f"sample_aggr_model_name: {cfg.sample_aggr_model_name}")
     print(f"  n_sample_aggr_layers: {cfg.n_sample_aggr_layers}")
     print(f"  sample_aggr_hidden_dims: {cfg.sample_aggr_hidden_dims}")
-    print(f"  saku_diag_est_place: {cfg.saku_diag_est_place}")
+    print(f"  dial_diag_est_place: {cfg.dial_diag_est_place}")
     print(f"base_model: {cfg.base_model}")
     print(f"  n_base_layers: {cfg.n_base_layers}")
     print(f"  base_hidden_dims: {cfg.base_hidden_dims}")
     print("=" * 50)
 
     if cfg.wandb:
-        wandb.login(key="") # use your own WanbB key
+        if not args.testing:
+            wandb.login(key="")  # use your own WandB key
         wandb.init(
             mode="disabled" if args.testing else "online",
             dir=root("."), 
