@@ -21,7 +21,6 @@ pip install -r req_pyg.txt
 | ZINC (12k subset) | `data/zinc/` | Downloaded automatically on first run |
 | Cycle counting | `data/count_cycle/` | Included; dataset from [I2-GNN (Huang et al., 2023)](https://github.com/GraphPKU/I2GNN) |
 | Directed patterns | `data/pattern/simple/` | Included; synthetic directed multigraphs from [Egressy et al., 2024](https://arxiv.org/abs/2306.11586)|
-| CIFAR10 / MNIST superpixels | `data/superpixels/` | Downloaded automatically by PyTorch Geometric |
 | DrugOOD | `data/drugood/` | `python download_drugood.py`|
 
 ## Reproducing the paper
@@ -62,28 +61,7 @@ python runner.py --config_dirpath ../configs/cycle_counts_i2gnn --config_name pe
 python runner.py --config_dirpath ../configs/cycle_counts_i2gnn --config_name dial.yaml --gpu_id 0
 ```
 
-Expects the I2GNN `count_cycle` dataset under `data/count_cycle`.
-
-The GPS comparison can be split by cycle length and seed for parallel cluster jobs:
-
-```bash
-cd cycle_count_i2gnn
-python runner.py --config_dirpath ../configs/cycle_counts_i2gnn --config_name gps.yaml --cycles 3 --seed 0 --num_seeds 1
-python runner.py --config_dirpath ../configs/cycle_counts_i2gnn --config_name dial_gps.yaml --cycles 3 --seed 0 --num_seeds 1
-```
-
-### Continuous node features (`configs/superpixels/`)
-
-The CIFAR10 superpixel experiment uses continuous color and coordinate features and the official train/validation/test splits. Run the task-only, R-PEARL, and DIAL variants from the repository root:
-
-```bash
-python -m superpixels.runner --config_name baseline --num_seeds 1
-python -m superpixels.runner --config_name rpearl --num_seeds 1
-python -m superpixels.runner --config_name dial --num_seeds 1
-```
-
-The probe configurations initially use 32 samples for quick turnaround. Override settings on the command line, for example with `num_samples=64`, or use the smaller MNIST superpixel benchmark as a runtime fallback with `--dataset_name MNIST`.
-Run one pilot job first so that the dataset is downloaded and processed before launching parallel jobs on a shared filesystem.
+Expects the I2GNN `count_cycle` dataset under `data/count_cycle`. Use `--cycles 3,4` to train only some cycle lengths, and `--num_seeds` to change the number of seeds (default 3).
 
 ### DrugOOD
 
@@ -97,12 +75,6 @@ python runner.py --config_dirpath ../configs/drugood --config_name dial_size.yam
 ```
 
 Each command trains one seed. It reports ROC-AUC on the in-distribution and out-of-distribution validation and test sets.
-
-### Slurm
-
-Array jobs for the rebuttal experiments are documented in
-[`slurm/README.md`](slurm/README.md). They write Slurm output, checkpoints, and
-per-run training logs under the repository's `log/` directory.
 
 ## Acknowledgements
 

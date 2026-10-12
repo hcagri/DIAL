@@ -6,7 +6,6 @@ from torch_geometric.data import Batch
 from torch_geometric.nn import global_mean_pool, global_add_pool
 
 from src.gine import GINE
-from src.gps import GPSBaseModel
 from src.mlp import MLP
 from src.pe import PEARLPositionalEncoder, GetSampleAggregator, dialPositionalEncoder
 from src.gin import GIN
@@ -32,21 +31,6 @@ def construct_model(cfg: Schema, list_create_mlp, deg1=None, peptides=False, **k
             target_dim=target_dim, bn=cfg.gine_model_bn, pe_emb=cfg.pe_dims, peptides=peptides
         )
 
-    elif cfg.base_model == 'gps':
-        base_model = GPSBaseModel(
-            cfg.n_base_layers,
-            cfg.n_edge_types,
-            cfg.node_emb_dims,
-            cfg.base_hidden_dims,
-            create_mlp,
-            pooling=cfg.pooling,
-            target_dim=target_dim,
-            heads=cfg.gps_heads,
-            dropout=cfg.gps_dropout,
-            attn_dropout=cfg.gps_attn_dropout,
-            local_model=cfg.gps_local_model,
-        )
-    
     elif cfg.base_model == 'pna':
         base_model = PNABaseModel(
             cfg.n_base_layers, cfg.n_edge_types, cfg.node_emb_dims, cfg.base_hidden_dims, create_mlp,
